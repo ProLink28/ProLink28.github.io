@@ -37,8 +37,12 @@ function applyTheme(t, persist = true) {
 
 /* ---------- Password reset (email code) ---------- */
 // Optional: real emails via https://www.emailjs.com (free tier). Leave empty for demo mode.
-const EMAILJS = { publicKey: '', serviceId: '', templateId: '' };
+const EMAILJS = { publicKey: 'fmfWdjP7GgCW6cUEl', serviceId: 'service_fs7cftu', templateId: 'template_c3ur72o' };
 // In your EmailJS template, use the variables: {{to_email}}, {{to_name}}, {{code}}
+/* Only these email providers can be used to sign up or reset a password. */
+const ALLOWED_EMAIL_DOMAINS = ['gmail.com', 'yahoo.com', 'outlook.com'];
+const EMAIL_RULE_MSG = 'Please use a Gmail, Yahoo or Outlook email address.';
+const emailOk = e => /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(e) && ALLOWED_EMAIL_DOMAINS.includes(e.split('@')[1]);
 const CODE_TTL = 10 * 60 * 1000, MAX_ATTEMPTS = 5, RESEND_COOLDOWN = 30 * 1000;
 let reset = null; // { email, code, expires, attempts, lastSent, verified }
 
@@ -68,6 +72,7 @@ function resetForgotFlow() {
   showForgotStep('forgotEmailForm');
 }
 async function issueCode(email) {
+  if (!emailOk(email)) { toast(EMAIL_RULE_MSG, 'err'); return false; }
   const account = db.users.find(x => (x.email || '').toLowerCase() === email);
   if (!account) { toast('No account found for that email.', 'err'); return false; }
   if (reset && reset.email === email && Date.now() - reset.lastSent < RESEND_COOLDOWN) {
@@ -208,6 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const password = $('#signupPassword').value, role = $('#signupRole').value;
     const confirmPw = $('#signupConfirmPassword').value;
     if (name.length < 2) return toast('Please enter your full name.', 'err');
+    if (!emailOk(email)) return toast(EMAIL_RULE_MSG, 'err');
     if (nameTaken(name)) { updateNameMsg(); return toast('This name is already taken. Please use a different name.', 'err'); }
     if (password.length < 6) return toast('Password must be at least 6 characters.', 'err');
     if (password !== confirmPw) return toast('Passwords do not match.', 'err');
