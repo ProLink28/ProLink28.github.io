@@ -36,30 +36,26 @@ function applyTheme(t, persist = true) {
 }
 
 /* ---------- Password reset (email code) ---------- */
-// Optional: real emails via https://www.emailjs.com (free tier). Leave empty for demo mode.
+// Real emails are sent through https://www.emailjs.com (free tier: 200 emails per month). Keys are filled in below.
 const EMAILJS = { publicKey: 'fmfWdjP7GgCW6cUEl', serviceId: 'service_fs7cftu', templateId: 'template_c3ur72o' };
 // In your EmailJS template, use the variables: {{to_email}}, {{to_name}}, {{code}}
 /* Only these email providers can be used to sign up or reset a password. */
 const ALLOWED_EMAIL_DOMAINS = ['gmail.com', 'yahoo.com', 'outlook.com'];
 const EMAIL_RULE_MSG = 'Please use a Gmail, Yahoo or Outlook email address.';
 const emailOk = e => /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(e) && ALLOWED_EMAIL_DOMAINS.includes(e.split('@')[1]);
-const CODE_TTL = 10 * 60 * 1000, MAX_ATTEMPTS = 5, RESEND_COOLDOWN = 30 * 1000;
+const CODE_TTL = 10 * 60 * 1000, MAX_ATTEMPTS = 5, RESEND_COOLDOWN = 15 * 1000;   // seconds a user waits before asking for another code
 let reset = null; // { email, code, expires, attempts, lastSent, verified }
 
 const makeCode = () => String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, '0');
 
 async function sendResetEmail(account, code) {
-  if (EMAILJS.publicKey && EMAILJS.serviceId && EMAILJS.templateId) {
-    if (!window.emailjs) await new Promise((res, rej) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4.4.1/dist/email.min.js';
-      s.onload = res; s.onerror = rej; document.head.appendChild(s);
-    });
-    emailjs.init({ publicKey: EMAILJS.publicKey });
-    await emailjs.send(EMAILJS.serviceId, EMAILJS.templateId, { to_email: account.email, to_name: account.name, code });
-    return 'email';
-  }
-  return 'demo';
+  if (!window.emailjs) await new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4.4.1/dist/email.min.js';
+    s.onload = res; s.onerror = () => rej(new Error('Could not load the email service. Check your internet connection.')); document.head.appendChild(s);
+  });
+  emailjs.init({ publicKey: EMAILJS.publicKey });
+  await emailjs.send(EMAILJS.serviceId, EMAILJS.templateId, { to_email: account.email, to_name: account.name, code });
 }
 
 function showForgotStep(step) {
@@ -68,7 +64,6 @@ function showForgotStep(step) {
 function resetForgotFlow() {
   reset = null;
   ['forgotEmailForm', 'forgotCodeForm', 'forgotResetForm'].forEach(id => $('#' + id).reset());
-  $('#demoInbox').classList.add('hidden');
   showForgotStep('forgotEmailForm');
 }
 async function issueCode(email) {
@@ -81,17 +76,13 @@ async function issueCode(email) {
   }
   const code = makeCode();
   try {
-    const mode = await sendResetEmail(account, code);
+    await sendResetEmail(account, code);
     reset = { email, code, expires: Date.now() + CODE_TTL, attempts: 0, lastSent: Date.now(), verified: false };
-    const box = $('#demoInbox');
-    if (mode === 'demo') {
-      box.innerHTML = `📧 Demo inbox: your code is <b>${code}</b><br><span class="hint">No real email is sent in demo mode.</span>`;
-      box.classList.remove('hidden');
-    } else box.classList.add('hidden');
-    $('#codeSentMsg').textContent = mode === 'email' ? `We sent a 6-digit code to ${email}.` : 'Enter the 6-digit code shown below.';
+    $('#codeSentMsg').textContent = `We sent a 6-digit code to ${email}. Check your inbox (and spam folder).`;
     return true;
   } catch (err) {
-    toast('Could not send the email. Please try again.', 'err');
+    const why = err && (err.text || err.message);
+    toast('Could not send the email' + (why ? ': ' + why : '.') + ' Please try again.', 'err');
     return false;
   }
 }
