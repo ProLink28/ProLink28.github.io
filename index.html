@@ -48,7 +48,13 @@
         <span class="pw-hint" id="pwMatchMsg" aria-live="polite"></span></div>
       <div class="fg"><label for="signupRole">I am a...</label>
         <select class="field" id="signupRole"><option value="seeker">Job Seeker</option><option value="employer">Employer / Recruiter</option></select></div>
-      <button class="btn-primary" type="submit">Create account</button>
+      <button class="btn-primary" type="submit" id="signupSubmit">Create account</button>
+    </form>
+    <form id="signupCodeForm" class="hidden">
+      <p class="subtitle" id="signupCodeMsg">Enter the 6-digit code we sent to your email.</p>
+      <div class="fg"><label for="signupCode">Verification code</label><input class="field code-input" id="signupCode" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="one-time-code" required></div>
+      <button class="btn-primary" type="submit">Verify &amp; create account</button>
+      <p class="auth-footer"><a href="#" id="signupResend">Resend code</a> · <a href="#" id="signupBack">Back</a></p>
     </form>
     <p class="auth-footer">Already have an account? <a href="#" id="showLogin">Log in</a></p>
   </div>
@@ -115,5 +121,6 @@
 <div id="toasts"></div>
 
 <script src="script.js" defer></script>
+<script src="signup-verify.js" defer></script>
 </body>
 </html>
