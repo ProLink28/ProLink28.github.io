@@ -24,7 +24,7 @@
     <h2>Welcome back</h2>
     <p class="subtitle">Log in to continue to your account.</p>
     <form id="loginForm">
-      <div class="fg"><label for="loginEmail">Email</label><input class="field" id="loginEmail" type="email" placeholder="you@example.com" required></div>
+      <div class="fg"><label for="loginEmail">Email</label><input class="field" id="loginEmail" type="email" placeholder="you@gmail.com" required></div>
       <div class="fg"><label for="loginPassword">Password</label>
         <div class="pw"><input class="field" id="loginPassword" type="password" placeholder="Your password" required><button type="button" data-toggle="loginPassword" aria-label="Show password" title="Show password"></button></div></div>
       <button class="btn-primary" type="submit">Log in</button>
@@ -39,7 +39,7 @@
     <p class="subtitle">Join as a job seeker or an employer.</p>
     <form id="signupForm">
       <div class="fg"><label for="signupName">Full name</label><input class="field" id="signupName" placeholder="Juan Dela Cruz" required><span class="pw-hint" id="nameMsg" aria-live="polite"></span></div>
-      <div class="fg"><label for="signupEmail">Email</label><input class="field" id="signupEmail" type="email" placeholder="you@example.com" required></div>
+      <div class="fg"><label for="signupEmail">Email</label><input class="field" id="signupEmail" type="email" placeholder="you@gmail.com" required><span class="hint">Gmail, Yahoo or Outlook addresses only</span></div>
       <div class="fg"><label for="signupPassword">Password (min. 6 characters)</label>
         <div class="pw"><input class="field" id="signupPassword" type="password" minlength="6" required><button type="button" data-toggle="signupPassword" aria-label="Show password" title="Show password"></button></div></div>
       <div class="fg"><label for="signupConfirmPassword">Confirm password</label>
@@ -58,14 +58,13 @@
 
     <form id="forgotEmailForm">
       <p class="subtitle">Enter your registered email and we'll send you a 6-digit code.</p>
-      <div class="fg"><label for="forgotEmail">Registered email</label><input class="field" id="forgotEmail" type="email" placeholder="you@example.com" required></div>
+      <div class="fg"><label for="forgotEmail">Registered email</label><input class="field" id="forgotEmail" type="email" placeholder="you@gmail.com" required><span class="hint">Gmail, Yahoo or Outlook only. The code is sent to this address.</span></div>
       <button class="btn-primary" type="submit" id="sendCodeBtn">Send code</button>
     </form>
 
     <form id="forgotCodeForm" class="hidden">
       <p class="subtitle" id="codeSentMsg">Enter the 6-digit code we sent to your email.</p>
       <div class="fg"><label for="resetCode">Verification code</label><input class="field code-input" id="resetCode" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="one-time-code" required></div>
-      <div id="demoInbox" class="demo-inbox hidden"></div>
       <button class="btn-primary" type="submit">Verify code</button>
       <p class="auth-footer"><a href="#" id="resendCode">Resend code</a></p>
     </form>
