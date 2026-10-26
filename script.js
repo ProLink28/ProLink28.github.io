@@ -157,136 +157,6 @@ function logout() {
   $('#signupView').classList.add('hidden'); $('#forgotView').classList.add('hidden'); $('#loginView').classList.remove('hidden');
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  applyTheme(currentTheme(), false);
-  $('#showSignup').onclick = e => { e.preventDefault(); $('#loginView').classList.add('hidden'); $('#signupView').classList.remove('hidden'); };
-  $('#showLogin').onclick = e => { e.preventDefault(); $('#signupView').classList.add('hidden'); $('#forgotView').classList.add('hidden'); $('#loginView').classList.remove('hidden'); resetForgotFlow(); };
-  $('#showForgot').onclick = e => { e.preventDefault(); resetForgotFlow(); $('#loginView').classList.add('hidden'); $('#forgotView').classList.remove('hidden'); };
-  $('#backToLogin').onclick = e => { e.preventDefault(); resetForgotFlow(); $('#forgotView').classList.add('hidden'); $('#loginView').classList.remove('hidden'); };
-
-  const svg = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
-  const EYE = svg('<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>');
-  const EYE_OFF = svg('<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>');
-  document.querySelectorAll('[data-toggle]').forEach(b => {
-    b.innerHTML = EYE;
-    b.onclick = () => {
-      const i = $('#' + b.dataset.toggle), show = i.type === 'password';
-      i.type = show ? 'text' : 'password';
-      b.innerHTML = show ? EYE_OFF : EYE;
-      b.title = b.ariaLabel = show ? 'Hide password' : 'Show password';
-    };
-  });
-
-  /* Warn when the full name is already used by another account */
-  const nameTaken = n => { const k = n.trim().replace(/\s+/g, ' ').toLowerCase(); return !!k && db.users.some(u => (u.name || '').trim().replace(/\s+/g, ' ').toLowerCase() === k); };
-  const updateNameMsg = () => {
-    const t = nameTaken($('#signupName').value), m = $('#nameMsg');
-    m.textContent = t ? '⚠ This name is already taken. Please use a different name.' : '';
-    m.className = 'pw-hint' + (t ? ' bad' : '');
-  };
-  $('#signupName').addEventListener('input', e => { e.target.value = cleanName(e.target.value); updateNameMsg(); });
-
-  /* Live "passwords match" hint under Confirm password */
-  const updatePwMatch = () => {
-    const a = $('#signupPassword').value, b = $('#signupConfirmPassword').value, msg = $('#pwMatchMsg');
-    if (!b) { msg.textContent = ''; msg.className = 'pw-hint'; return; }
-    const ok = a === b;
-    msg.textContent = ok ? '✓ Passwords match' : '✗ Passwords do not match';
-    msg.className = 'pw-hint ' + (ok ? 'ok' : 'bad');
-  };
-  $('#signupPassword').addEventListener('input', updatePwMatch);
-  $('#signupConfirmPassword').addEventListener('input', updatePwMatch);
-
-  $('#signupForm').onsubmit = e => {
-    e.preventDefault();
-    const name = $('#signupName').value.trim().replace(/\s+/g, ' ');
-    const email = $('#signupEmail').value.trim().toLowerCase();
-    const password = $('#signupPassword').value, role = $('#signupRole').value;
-    const confirmPw = $('#signupConfirmPassword').value;
-    if (name.length < 2) return toast('Please enter your full name.', 'err');
-    if (!emailOk(email)) return toast(EMAIL_RULE_MSG, 'err');
-    if (nameTaken(name)) { updateNameMsg(); return toast('This name is already taken. Please use a different name.', 'err'); }
-    if (password.length < 6) return toast('Password must be at least 6 characters.', 'err');
-    if (password !== confirmPw) return toast('Passwords do not match.', 'err');
-    if (db.users.some(u => u.email === email)) return toast('An account with this email already exists.', 'err');
-    const u = { id: Date.now(), name, email, password, role, company: '', bio: '', location: '', birthdate: '', sex: '', created: Date.now() };
-    db.users.push(u);
-    if (!save()) { db.users.pop(); return toast('Unable to save your account. Storage may be full.', 'err'); }
-    e.target.reset(); updatePwMatch(); updateNameMsg(); login(u); toast(`Welcome to ProLink, ${name.split(' ')[0]}!`);
-  };
-  $('#loginForm').onsubmit = e => {
-    e.preventDefault();
-    const email = $('#loginEmail').value.trim().toLowerCase(), pw = $('#loginPassword').value;
-    const u = db.users.find(x => (x.email || '').toLowerCase() === email);
-    if (!u || u.password !== pw) return toast('Incorrect email or password. Try again.', 'err');
-    e.target.reset(); login(u);
-  };
-
-  /* Forgot password: email -> code -> new password */
-  $('#forgotEmailForm').onsubmit = async e => {
-    e.preventDefault();
-    const btn = $('#sendCodeBtn'); btn.disabled = true; btn.textContent = 'Sending…';
-    const ok = await issueCode($('#forgotEmail').value.trim().toLowerCase());
-    btn.disabled = false; btn.textContent = 'Send code';
-    if (ok) { showForgotStep('forgotCodeForm'); toast('Verification code sent.'); }
-  };
-  $('#resendCode').onclick = async e => {
-    e.preventDefault();
-    if (!reset) return;
-    if (await issueCode(reset.email)) toast('A new code was sent.');
-  };
-  $('#forgotCodeForm').onsubmit = e => {
-    e.preventDefault();
-    if (!reset) { showForgotStep('forgotEmailForm'); return toast('Please request a new code.', 'err'); }
-    if (Date.now() > reset.expires) { reset = null; showForgotStep('forgotEmailForm'); return toast('Code expired. Request a new one.', 'err'); }
-    if (++reset.attempts > MAX_ATTEMPTS) { reset = null; showForgotStep('forgotEmailForm'); return toast('Too many wrong attempts. Request a new code.', 'err'); }
-    if ($('#resetCode').value.trim() !== reset.code) return toast(`Incorrect code. ${MAX_ATTEMPTS - reset.attempts} attempt(s) left.`, 'err');
-    reset.verified = true;
-    showForgotStep('forgotResetForm');
-    toast('Code verified.');
-  };
-  $('#forgotResetForm').onsubmit = e => {
-    e.preventDefault();
-    if (!reset || !reset.verified || Date.now() > reset.expires) { resetForgotFlow(); return toast('Session expired. Start again.', 'err'); }
-    const password = $('#resetPassword').value, confirm = $('#confirmResetPassword').value;
-    if (password.length < 6) return toast('Password must be at least 6 characters.', 'err');
-    if (password !== confirm) return toast('Passwords do not match.', 'err');
-    const account = db.users.find(x => (x.email || '').toLowerCase() === reset.email);
-    if (!account) { resetForgotFlow(); return toast('Account not found.', 'err'); }
-    account.password = password;
-    if (!save()) return toast('Unable to save the new password. Storage may be full.', 'err');
-    resetForgotFlow();
-    $('#forgotView').classList.add('hidden');
-    $('#loginView').classList.remove('hidden');
-    toast('Password updated. You can now log in.');
-  };
-
-
-  /* Profile dropdown + theme switches */
-  $('#ddLogout').onclick = () => { closeMenu(); logout(); };
-  $('#bellBtn').onclick = e => {
-    e.stopPropagation();
-    const m = $('#notifMenu');
-    if (!m.classList.contains('hidden')) return m.classList.add('hidden');
-    closeMenu(); renderBell(); m.classList.remove('hidden');
-    let changed = false; myNotifs().forEach(n => { if (!n.read) { n.read = true; changed = true; } });
-    if (changed) { save(); $('#bellBadge').classList.add('hidden'); }
-  };
-  document.querySelectorAll('[data-theme-toggle],[data-theme-switch]').forEach(b =>
-    b.addEventListener('click', e => { e.stopPropagation(); applyTheme(currentTheme() === 'dark' ? 'light' : 'dark'); }));
-  $('#profileBtn').onclick = e => { e.stopPropagation(); $('#profileMenu').classList.contains('hidden') ? openMenu() : closeMenu(); };
-  $('#profileMenu').querySelectorAll('[data-go]').forEach(b => b.onclick = () => { closeMenu(); go(b.dataset.go, ''); });
-  document.addEventListener('click', e => { if (!e.target.closest('.profile-wrap')) closeMenu(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
-  window.addEventListener('storage', e => {
-    if (e.key !== STORE_KEY) return;
-    db = loadDB();
-    if (!current) return;
-    if (!user()) logout(); else render();
-  });
-  const saved = store.get(SESSION_KEY), u = saved && db.users.find(x => String(x.id) === saved);
-  if (u) login(u);
-});
 
 /* ---------- Navigation ---------- */
 const NAV = {
@@ -322,6 +192,7 @@ function render() {
   applyTheme(currentTheme(), false);
   $('#nav').innerHTML = items.map(([id, l]) => `<button class="${page === id ? 'active' : ''}" data-page="${id}">${l}</button>`).join('');
   $('#nav').querySelectorAll('button').forEach(b => b.onclick = () => go(b.dataset.page, ''));
+  { const nv = $('#nav'), ac = nv.querySelector('.active'); if (ac && nv.scrollWidth > nv.clientWidth) nv.scrollLeft = ac.offsetLeft - (nv.clientWidth - ac.offsetWidth) / 2; }
   const views = { dashboard, jobs, saved: savedJobs, applications, profile, post, manage, applicants, settings, about };
   const binders = { jobs: bindJobs, profile: bindProfile, post: bindPost, settings: bindSettings };
   $('#content').innerHTML = views[page]();
@@ -355,7 +226,7 @@ function dashboard() {
     <div class="panel"><h3>Applicants by status</h3>${statusChart(apps)}</div>
     <div class="panel"><h3>Recent applicants</h3>
       ${apps.length ? `<div class="table-wrap"><table class="table"><tr><th>Candidate</th><th>Position</th><th>Status</th></tr>
-        ${apps.slice(-5).reverse().map(a => `<tr><td>${esc(userName(a.userId))}</td><td>${esc(db.jobs.find(j => j.id === a.jobId)?.title || '')}</td><td><span class="status ${a.status}">${a.status}</span></td></tr>`).join('')}
+        ${apps.slice(-5).reverse().map(a => `<tr><td data-label="Candidate">${esc(userName(a.userId))}</td><td data-label="Position">${esc(db.jobs.find(j => j.id === a.jobId)?.title || '')}</td><td data-label="Status"><span class="status ${a.status}">${a.status}</span></td></tr>`).join('')}
       </table></div>` : '<div class="empty">Applicants will appear here when candidates apply.</div>'}
     </div>`;
 }
@@ -456,9 +327,9 @@ function applications() {
     <div class="panel">${list.length ? `<div class="table-wrap"><table class="table">
       <tr><th>Position</th><th>Company</th><th>Salary</th><th>Date applied</th><th>Status</th><th></th></tr>
       ${list.map(a => { const j = db.jobs.find(x => x.id === a.jobId) || {};
-        return `<tr id="app-${a.id}"><td>${esc(j.title || 'Removed job')}</td><td>${esc(j.company || '—')}</td><td>${esc(j.salary || 'Not specified')}</td>
-        <td>${new Date(a.date).toLocaleDateString()}</td><td><span class="status ${a.status}">${a.status}</span></td>
-        <td><div class="row-actions"><button class="secondary" onclick="showTimeline(${a.id})">Timeline</button>${a.status === 'Pending' ? `<button class="secondary" onclick="withdraw(${a.id})">Withdraw</button>` : ''}</div></td></tr>`; }).join('')}
+        return `<tr id="app-${a.id}"><td data-label="Position">${esc(j.title || 'Removed job')}</td><td data-label="Company">${esc(j.company || '—')}</td><td data-label="Salary">${esc(j.salary || 'Not specified')}</td>
+        <td data-label="Date applied">${new Date(a.date).toLocaleDateString()}</td><td data-label="Status"><span class="status ${a.status}">${a.status}</span></td>
+        <td class="td-actions"><div class="row-actions"><button class="secondary" onclick="showTimeline(${a.id})">Timeline</button>${a.status === 'Pending' ? `<button class="secondary" onclick="withdraw(${a.id})">Withdraw</button>` : ''}</div></td></tr>`; }).join('')}
     </table></div>` : `<div class="empty">No applications yet. <a href="#" onclick="go('jobs');return false">Browse jobs →</a></div>`}</div>`;
 }
 async function withdraw(id) {
@@ -571,9 +442,9 @@ function manage() {
   return `${pageHeader('Manage Job Postings', 'View and edit your existing job posts.', `<button class="primary" onclick="go('post')">＋ Create a job</button>`)}
     <div class="panel">${list.length ? `<div class="table-wrap"><table class="table">
       <tr><th>Position</th><th>Type</th><th>Location</th><th>Applicants</th><th>Status</th><th>Actions</th></tr>
-      ${list.map(j => `<tr><td>${esc(j.title)}</td><td>${esc(j.type)}</td><td>${esc(j.location)}</td><td>${db.applications.filter(a => a.jobId === j.id).length}</td>
-        <td><span class="status ${jobStatus(j) === 'Open' ? 'Accepted' : jobStatus(j) === 'Closed' ? 'Rejected' : 'Pending'}">${jobStatus(j)}</span></td>
-        <td><div class="row-actions"><button class="secondary" onclick="editJob(${j.id})">Edit</button><button class="secondary" onclick="toggleJob(${j.id})">${j.closed ? 'Reopen' : 'Close'}</button><button class="danger" onclick="deleteJob(${j.id})">Delete</button></div></td></tr>`).join('')}
+      ${list.map(j => `<tr><td data-label="Position">${esc(j.title)}</td><td data-label="Type">${esc(j.type)}</td><td data-label="Location">${esc(j.location)}</td><td data-label="Applicants">${db.applications.filter(a => a.jobId === j.id).length}</td>
+        <td data-label="Status"><span class="status ${jobStatus(j) === 'Open' ? 'Accepted' : jobStatus(j) === 'Closed' ? 'Rejected' : 'Pending'}">${jobStatus(j)}</span></td>
+        <td class="td-actions"><div class="row-actions"><button class="secondary" onclick="editJob(${j.id})">Edit</button><button class="secondary" onclick="toggleJob(${j.id})">${j.closed ? 'Reopen' : 'Close'}</button><button class="danger" onclick="deleteJob(${j.id})">Delete</button></div></td></tr>`).join('')}
     </table></div>` : `<div class="empty">You have not posted any jobs yet. <a href="#" onclick="go('post');return false">Create your first job →</a></div>`}</div>`;
 }
 function editJob(id) { if (!myJobs().some(j => j.id === id)) return; editingJobId = id; page = 'post'; animateNext = true; render(); window.scrollTo(0, 0); }
@@ -597,15 +468,15 @@ function applicants() {
       <input class="field" id="appSearch" placeholder="🔍 Search candidate or position" value="${esc(appQuery)}" oninput="setAppQuery(this.value)">
       <select class="field" style="max-width:200px" onchange="appSort=this.value;render()">${[['new', 'Newest first'], ['old', 'Oldest first'], ['az', 'Name A–Z']].map(([v, l]) => `<option value="${v}" ${appSort === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
     </div>
-    <div class="panel">${list.length ? `<div class="table-wrap"><table class="table">
+    <div class="panel" id="appPanel">${list.length ? `<div class="table-wrap"><table class="table">
       <tr><th>Candidate</th><th>Position</th><th>Date</th><th>Profile</th><th>Documents</th><th>Notes</th><th>Status</th></tr>
       ${list.map(a => { const c = db.users.find(x => x.id === a.userId);
-        return `<tr><td>${esc(c?.name || 'Candidate')}${c && isComplete(c) ? badge(true) : ''}<br><span class="muted">${esc(c?.email || '')}</span></td>
-        <td>${esc(db.jobs.find(j => j.id === a.jobId)?.title || '')}</td><td>${a.date ? esc(new Date(a.date).toLocaleString()) : 'Date unavailable'}</td>
-        <td><button class="secondary" onclick="viewApplicantProfile(${a.id})">View Profile</button></td>
-        <td>${(a.documents || []).map((d, i) => `<button class="doc-link" onclick="downloadDoc(${a.id},${i})">${esc(d.name)}</button>`).join('')}</td>
-        <td><button class="secondary" onclick="editNote(${a.id})">${a.note ? '📝 Edit note' : '＋ Add note'}</button></td>
-        <td><select class="field" onchange="askStatus(${a.id},this.value)">${options(STATUSES, a.status)}</select></td></tr>`; }).join('')}
+        return `<tr><td data-label="Candidate">${esc(c?.name || 'Candidate')}${c && isComplete(c) ? badge(true) : ''}<br><span class="muted">${esc(c?.email || '')}</span></td>
+        <td data-label="Position">${esc(db.jobs.find(j => j.id === a.jobId)?.title || '')}</td><td data-label="Date">${a.date ? esc(new Date(a.date).toLocaleString()) : 'Date unavailable'}</td>
+        <td data-label="Profile"><button class="secondary" onclick="viewApplicantProfile(${a.id})">View Profile</button></td>
+        <td data-label="Documents">${(a.documents || []).map((d, i) => `<button class="doc-link" onclick="downloadDoc(${a.id},${i})">${esc(d.name)}</button>`).join('')}</td>
+        <td data-label="Notes"><button class="secondary" onclick="editNote(${a.id})">${a.note ? '📝 Edit note' : '＋ Add note'}</button></td>
+        <td data-label="Status"><select class="field" onchange="askStatus(${a.id},this.value)">${options(STATUSES, a.status)}</select></td></tr>`; }).join('')}
     </table></div>` : '<div class="empty">No applicants found.</div>'}</div>`;
 }
 function viewApplicantProfile(applicationId) {
@@ -774,8 +645,10 @@ function confirmBox(title, text, okLabel = 'Confirm', danger = true) {
   });
 }
 function setAppQuery(v) {
-  appQuery = v; render();
-  const i = $('#appSearch'); if (i) { i.focus(); i.setSelectionRange(v.length, v.length); }
+  appQuery = v;
+  const t = document.createElement('div'); t.innerHTML = applicants();
+  const np = t.querySelector('#appPanel'), cp = $('#appPanel');
+  if (np && cp) cp.innerHTML = np.innerHTML; else render();
 }
 function editNote(id) {
   const a = db.applications.find(x => x.id === id);
@@ -890,7 +763,7 @@ function about() {
     w = canvas.clientWidth; h = canvas.clientHeight;
     canvas.width = w * dpr; canvas.height = h * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const count = Math.max(12, Math.min(34, Math.floor(w * h / 42000)));
+    const count = Math.max(innerWidth < 700 ? 8 : 12, Math.min(34, Math.floor(w * h / 42000)));
     nodes = Array.from({ length: count }, () => {
       const z = 0.35 + Math.random() * 0.65;           // depth: 1 = closest
       const ang = Math.random() * Math.PI * 2, sp = 0.15 + z * 0.45;
@@ -905,7 +778,7 @@ function about() {
 
   function frame() {
     if (!$('#auth').classList.contains('hidden')) {     // pause when logged in
-      if (canvas.clientWidth !== w || canvas.clientHeight !== h) init();
+      if (canvas.clientWidth !== w || Math.abs(canvas.clientHeight - h) > 150) init();
       ctx.clearRect(0, 0, w, h);
 
       for (let i = 0; i < nodes.length; i++) {
@@ -939,7 +812,7 @@ function about() {
 
   addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
   document.addEventListener('mouseleave', () => { mouse.x = mouse.y = -999; });
-  let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { init(); if (reduce) frame(); }, 150); });
+  let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (Math.abs(canvas.clientWidth - w) > 1) init(); if (reduce) frame(); }, 150); });
 
   init(); frame();
 })();
@@ -978,7 +851,7 @@ function about() {
     w = canvas.clientWidth; h = canvas.clientHeight;
     canvas.width = w * dpr; canvas.height = h * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const count = Math.max(10, Math.min(26, Math.floor(w * h / 60000)));
+    const count = Math.max(innerWidth < 700 ? 6 : 10, Math.min(26, Math.floor(w * h / 60000)));
     nodes = Array.from({ length: count }, () => {
       const z = 0.35 + Math.random() * 0.65, ang = Math.random() * Math.PI * 2, sp = 0.12 + z * 0.35;
       return { x: Math.random() * w, y: Math.random() * h, z, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
@@ -988,7 +861,7 @@ function about() {
 
   function frame() {
     if (!$('#app').classList.contains('hidden')) {      // only runs while logged in
-      if (canvas.clientWidth !== w || canvas.clientHeight !== h) init();
+      if (canvas.clientWidth !== w || Math.abs(canvas.clientHeight - h) > 150) init();
       const [rgb, k] = tone();
       ctx.clearRect(0, 0, w, h);
       for (let i = 0; i < nodes.length; i++) {
@@ -1020,4 +893,188 @@ function about() {
   addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
   document.addEventListener('mouseleave', () => { mouse.x = mouse.y = -999; });
   init(); frame();
+
+  document.addEventListener('DOMContentLoaded', () => {
+  applyTheme(currentTheme(), false);
+  $('#showSignup').onclick = e => { e.preventDefault(); $('#loginView').classList.add('hidden'); $('#signupView').classList.remove('hidden'); };
+  $('#showLogin').onclick = e => { e.preventDefault(); $('#signupView').classList.add('hidden'); $('#forgotView').classList.add('hidden'); $('#loginView').classList.remove('hidden'); resetForgotFlow(); };
+  $('#showForgot').onclick = e => { e.preventDefault(); resetForgotFlow(); $('#loginView').classList.add('hidden'); $('#forgotView').classList.remove('hidden'); };
+  $('#backToLogin').onclick = e => { e.preventDefault(); resetForgotFlow(); $('#forgotView').classList.add('hidden'); $('#loginView').classList.remove('hidden'); };
+
+  const svg = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+  const EYE = svg('<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>');
+  const EYE_OFF = svg('<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>');
+  document.querySelectorAll('[data-toggle]').forEach(b => {
+    b.innerHTML = EYE;
+    b.onclick = () => {
+      const i = $('#' + b.dataset.toggle), show = i.type === 'password';
+      i.type = show ? 'text' : 'password';
+      b.innerHTML = show ? EYE_OFF : EYE;
+      b.title = b.ariaLabel = show ? 'Hide password' : 'Show password';
+    };
+  });
+
+  /* Warn when the full name is already used by another account */
+  const nameTaken = n => { const k = n.trim().replace(/\s+/g, ' ').toLowerCase(); return !!k && db.users.some(u => (u.name || '').trim().replace(/\s+/g, ' ').toLowerCase() === k); };
+  const updateNameMsg = () => {
+    const t = nameTaken($('#signupName').value), m = $('#nameMsg');
+    m.textContent = t ? '⚠ This name is already taken. Please use a different name.' : '';
+    m.className = 'pw-hint' + (t ? ' bad' : '');
+  };
+  $('#signupName').addEventListener('input', e => { e.target.value = cleanName(e.target.value); updateNameMsg(); });
+
+  /* Live "passwords match" hint under Confirm password */
+  const updatePwMatch = () => {
+    const a = $('#signupPassword').value, b = $('#signupConfirmPassword').value, msg = $('#pwMatchMsg');
+    if (!b) { msg.textContent = ''; msg.className = 'pw-hint'; return; }
+    const ok = a === b;
+    msg.textContent = ok ? '✓ Passwords match' : '✗ Passwords do not match';
+    msg.className = 'pw-hint ' + (ok ? 'ok' : 'bad');
+  };
+  $('#signupPassword').addEventListener('input', updatePwMatch);
+  $('#signupConfirmPassword').addEventListener('input', updatePwMatch);
+
+  /* Sign up: form -> emailed code -> account created */
+  let signupPending = null; // { user, code, expires, attempts, lastSent }
+  const signupStep = s => {
+    $('#signupForm').classList.toggle('hidden', s !== 'form');
+    $('#signupCodeForm').classList.toggle('hidden', s !== 'code');
+  };
+  const signupCancel = () => { signupPending = null; $('#signupCodeForm').reset(); signupStep('form'); };
+  async function signupSendCode() {
+    const code = makeCode();
+    await sendResetEmail({ email: signupPending.user.email, name: signupPending.user.name }, code);
+    Object.assign(signupPending, { code, expires: Date.now() + CODE_TTL, attempts: 0, lastSent: Date.now() });
+  }
+
+  $('#signupForm').onsubmit = async e => {
+    e.preventDefault();
+    const name = $('#signupName').value.trim().replace(/\s+/g, ' ');
+    const email = $('#signupEmail').value.trim().toLowerCase();
+    const password = $('#signupPassword').value, role = $('#signupRole').value;
+    if (name.length < 2) return toast('Please enter your full name.', 'err');
+    if (!emailOk(email)) return toast(EMAIL_RULE_MSG, 'err');
+    if (nameTaken(name)) { updateNameMsg(); return toast('This name is already taken. Please use a different name.', 'err'); }
+    if (password.length < 6) return toast('Password must be at least 6 characters.', 'err');
+    if (password !== $('#signupConfirmPassword').value) return toast('Passwords do not match.', 'err');
+    if (db.users.some(u => u.email === email)) return toast('An account with this email already exists.', 'err');
+
+    const btn = $('#signupSubmit'); btn.disabled = true; btn.textContent = 'Sending code…';
+    signupPending = { user: { name, email, password, role } };
+    try {
+      await signupSendCode();
+      $('#signupCodeMsg').textContent = `We sent a 6-digit code to ${email}. Check your inbox (and spam folder).`;
+      signupStep('code'); $('#signupCode').focus();
+      toast('Verification code sent.');
+    } catch (err) {
+      signupPending = null;
+      const why = err && (err.text || err.message);
+      toast('Could not send the email' + (why ? ': ' + why : '.') + ' Please try again.', 'err');
+    }
+    btn.disabled = false; btn.textContent = 'Create account';
+  };
+
+  $('#signupCodeForm').onsubmit = e => {
+    e.preventDefault();
+    if (!signupPending || !signupPending.code) { signupCancel(); return toast('Please sign up again.', 'err'); }
+    if (Date.now() > signupPending.expires) { signupCancel(); return toast('Code expired. Please sign up again.', 'err'); }
+    if ($('#signupCode').value.trim() !== signupPending.code) {
+      if (++signupPending.attempts >= MAX_ATTEMPTS) { signupCancel(); return toast('Too many wrong attempts. Please sign up again.', 'err'); }
+      return toast(`Incorrect code. ${MAX_ATTEMPTS - signupPending.attempts} attempt(s) left.`, 'err');
+    }
+    const p = signupPending.user;
+    if (db.users.some(u => u.email === p.email)) { signupCancel(); return toast('An account with this email already exists.', 'err'); }
+    const u = { id: Date.now(), ...p, company: '', bio: '', location: '', birthdate: '', sex: '', created: Date.now() };
+    db.users.push(u);
+    if (!save()) { db.users.pop(); return toast('Unable to save your account. Storage may be full.', 'err'); }
+    signupPending = null;
+    $('#signupForm').reset(); $('#signupCodeForm').reset(); updatePwMatch(); updateNameMsg();
+    signupStep('form'); login(u); toast(`Welcome to ProLink, ${p.name.split(' ')[0]}!`);
+  };
+
+  $('#signupResend').onclick = async e => {
+    e.preventDefault();
+    if (!signupPending) return;
+    const wait = RESEND_COOLDOWN - (Date.now() - signupPending.lastSent);
+    if (wait > 0) return toast(`Please wait ${Math.ceil(wait / 1000)}s before requesting a new code.`, 'err');
+    try { await signupSendCode(); toast('A new code was sent.'); }
+    catch (err) { toast('Could not send the email. Please try again.', 'err'); }
+  };
+  $('#signupBack').onclick = e => { e.preventDefault(); signupCancel(); };
+  $('#showLogin').addEventListener('click', signupCancel);
+
+  $('#loginForm').onsubmit = e => {
+    e.preventDefault();
+    const email = $('#loginEmail').value.trim().toLowerCase(), pw = $('#loginPassword').value;
+    const u = db.users.find(x => (x.email || '').toLowerCase() === email);
+    if (!u || u.password !== pw) return toast('Incorrect email or password. Try again.', 'err');
+    e.target.reset(); login(u);
+  };
+
+  /* Forgot password: email -> code -> new password */
+  $('#forgotEmailForm').onsubmit = async e => {
+    e.preventDefault();
+    const btn = $('#sendCodeBtn'); btn.disabled = true; btn.textContent = 'Sending…';
+    const ok = await issueCode($('#forgotEmail').value.trim().toLowerCase());
+    btn.disabled = false; btn.textContent = 'Send code';
+    if (ok) { showForgotStep('forgotCodeForm'); toast('Verification code sent.'); }
+  };
+  $('#resendCode').onclick = async e => {
+    e.preventDefault();
+    if (!reset) return;
+    if (await issueCode(reset.email)) toast('A new code was sent.');
+  };
+  $('#forgotCodeForm').onsubmit = e => {
+    e.preventDefault();
+    if (!reset) { showForgotStep('forgotEmailForm'); return toast('Please request a new code.', 'err'); }
+    if (Date.now() > reset.expires) { reset = null; showForgotStep('forgotEmailForm'); return toast('Code expired. Request a new one.', 'err'); }
+    if (++reset.attempts > MAX_ATTEMPTS) { reset = null; showForgotStep('forgotEmailForm'); return toast('Too many wrong attempts. Request a new code.', 'err'); }
+    if ($('#resetCode').value.trim() !== reset.code) return toast(`Incorrect code. ${MAX_ATTEMPTS - reset.attempts} attempt(s) left.`, 'err');
+    reset.verified = true;
+    showForgotStep('forgotResetForm');
+    toast('Code verified.');
+  };
+  $('#forgotResetForm').onsubmit = e => {
+    e.preventDefault();
+    if (!reset || !reset.verified || Date.now() > reset.expires) { resetForgotFlow(); return toast('Session expired. Start again.', 'err'); }
+    const password = $('#resetPassword').value, confirm = $('#confirmResetPassword').value;
+    if (password.length < 6) return toast('Password must be at least 6 characters.', 'err');
+    if (password !== confirm) return toast('Passwords do not match.', 'err');
+    const account = db.users.find(x => (x.email || '').toLowerCase() === reset.email);
+    if (!account) { resetForgotFlow(); return toast('Account not found.', 'err'); }
+    account.password = password;
+    if (!save()) return toast('Unable to save the new password. Storage may be full.', 'err');
+    resetForgotFlow();
+    $('#forgotView').classList.add('hidden');
+    $('#loginView').classList.remove('hidden');
+    toast('Password updated. You can now log in.');
+  };
+
+
+  /* Profile dropdown + theme switches */
+  $('#ddLogout').onclick = () => { closeMenu(); logout(); };
+  $('#bellBtn').onclick = e => {
+    e.stopPropagation();
+    const m = $('#notifMenu');
+    if (!m.classList.contains('hidden')) return m.classList.add('hidden');
+    closeMenu(); renderBell(); m.classList.remove('hidden');
+    let changed = false; myNotifs().forEach(n => { if (!n.read) { n.read = true; changed = true; } });
+    if (changed) { save(); $('#bellBadge').classList.add('hidden'); }
+  };
+  document.querySelectorAll('[data-theme-toggle],[data-theme-switch]').forEach(b =>
+    b.addEventListener('click', e => { e.stopPropagation(); applyTheme(currentTheme() === 'dark' ? 'light' : 'dark'); }));
+  $('#profileBtn').onclick = e => { e.stopPropagation(); $('#profileMenu').classList.contains('hidden') ? openMenu() : closeMenu(); };
+  $('#profileMenu').querySelectorAll('[data-go]').forEach(b => b.onclick = () => { closeMenu(); go(b.dataset.go, ''); });
+  document.addEventListener('click', e => { if (!e.target.closest('.profile-wrap')) closeMenu(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+  window.addEventListener('storage', e => {
+    if (e.key !== STORE_KEY) return;
+    db = loadDB();
+    if (!current) return;
+    if (!user()) logout(); else render();
+  });
+  const saved = store.get(SESSION_KEY), u = saved && db.users.find(x => String(x.id) === saved);
+  if (u) login(u);
+});
+
 })();
