@@ -361,3 +361,83 @@ input[type=date].field::-webkit-calendar-picker-indicator{position:absolute;inse
 /* ===== Animated background behind the dashboard / app pages ===== */
 .app-bg-canvas{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
 .main-body{position:relative;z-index:1}
+/* ProLink: mobile layer. Load this AFTER style.css */
+html{-webkit-text-size-adjust:100%}
+body{min-height:100vh;min-height:100dvh;overflow-x:clip}
+img,canvas,svg{max-width:100%}
+.table-wrap{-webkit-overflow-scrolling:touch}
+
+/* No "stuck" hover effects on touch screens */
+@media (hover:none){
+  .stat:hover,.primary:hover:not(:disabled),.btn-primary:hover,.heart:hover,.chip:hover,.job:hover{transform:none}
+}
+
+@media (max-width:700px){
+  /* Forms: 16px text stops iPhones from zooming in on focus; bigger tap targets */
+  .field,select.field,textarea.field{font-size:16px;min-height:44px}
+  textarea.field{min-height:100px}
+  .primary,.secondary,.danger,.btn-primary,.ghost{min-height:44px}
+  .heart{min-width:44px;min-height:44px}
+
+  /* Navbar: logo + user on top, menu scrolls sideways underneath */
+  .navbar{padding:8px 12px;gap:8px}
+  .logo{font-size:18px}
+  .user-menu{gap:4px}
+  #nav{order:3;flex:1 1 100%;flex-wrap:nowrap;overflow-x:auto;gap:4px;scrollbar-width:none}
+  #nav::-webkit-scrollbar{display:none}
+  #nav button{flex:none;white-space:nowrap;min-height:40px}
+
+  /* Dropdowns (profile + notifications) fit the screen width */
+  .dropdown,.notif-menu{position:fixed;left:10px;right:10px;top:58px;min-width:0;max-height:70vh;max-height:70dvh;overflow-y:auto}
+
+  /* Page layout */
+  .main-body{margin:16px auto 28px;padding:0 12px}
+  .welcome h1{font-size:21px}
+  .welcome .primary{width:100%}
+  .cards{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+  .stat{padding:14px}
+  .stat strong{font-size:26px}
+  .panel{padding:16px;margin-bottom:16px;border-radius:12px}
+  .job{padding:14px}
+  .job-head{flex-direction:column;gap:8px}
+  .job-side{justify-content:flex-start}
+  .tag.g{border-radius:12px}
+  .toolbar .field{flex:1 1 100%;max-width:none!important}
+  .check{padding:6px 0}
+  .count{flex-wrap:wrap;gap:8px}
+
+  /* Tables scroll sideways instead of squeezing */
+  .table{min-width:600px}
+  .table th,.table td{padding:10px 8px}
+  .table td .field{min-width:130px}
+
+  /* Forms and settings */
+  .form-actions{flex-direction:column}
+  .form-actions .primary,.form-actions .secondary{width:100%}
+  .setting-select{max-width:none;width:100%}
+  .bar-row{grid-template-columns:70px 1fr 26px;gap:8px}
+  .applicant-profile-head{gap:12px}
+
+  /* Pop-ups */
+  .modal-backdrop{padding:10px}
+  .modal{padding:20px;border-radius:14px;max-height:92vh;max-height:92dvh}
+  .actions{flex-direction:column-reverse}
+  .actions button{width:100%}
+
+  /* Login / sign up / reset */
+  .auth-container{min-height:100vh;min-height:100dvh;padding:64px 14px 24px}
+  .auth-card{padding:24px 18px;border-radius:16px}
+  .brand{font-size:1.4rem}
+  .theme-fab{top:10px;right:10px}
+  .code-input{letter-spacing:.35em;font-size:20px}
+
+  /* Toasts use the full width at the bottom */
+  #toasts{left:12px;right:12px;bottom:12px}
+}
+
+@media (max-width:380px){
+  .logo{font-size:16px}
+  .profile-btn{padding-right:6px}
+  .caret{display:none}
+  .chip{padding:6px 10px;font-size:12px}
+}
